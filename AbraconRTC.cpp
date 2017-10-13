@@ -1,13 +1,29 @@
 #include <Wire.h>
 #include "AbraconRTC.h"
 
+static bool writeRegister(uint8_t addr, uint8_t val) {
+	Wire.beginTransmission(RTC_ADDR);
+	if (Wire.write(addr)  != 1) {return 0;} // send address of register to write to
+	if (Wire.write(val) != 1) {return 0;} // send updated register value
+	Wire.endTransmission();
+
+	return 1;
+}
+
+static bool selectRegister(uint8_t addr) {
+	Wire.beginTransmission(RTC_ADDR);
+	if (Wire.write(addr) != 1) {return 0;} // send address of register to select
+	Wire.endTransmission();
+
+	return 1;
+}
+
 RTCData getRTCData() {
 	RTCData newRTCData = {0};
   
 	// get time
-	Wire.beginTransmission(RTC_ADDR);
-	Wire.write(SEC_ADDR); // send address of seconds register
-	Wire.endTransmission();
+	// select seconds register to begin reading from
+	selectRegister(SEC_ADDR);
 
 	Wire.requestFrom(RTC_ADDR, 3); // request 3 bytes for sec, min, hour
 	if (Wire.available() == 3) { // make sure 3 bytes were returned
@@ -34,9 +50,8 @@ RTCData getRTCData() {
 	}
 
 	// get temperature
-	Wire.beginTransmission(RTC_ADDR);
-	Wire.write(TEMP_ADDR); // send address of temperature register
-	Wire.endTransmission();
+	// select seconds register to begin reading from
+	selectRegister(TEMP_ADDR);
 
 	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for temperature
 	if (Wire.available() == 1) { // make sure 1 byte was returned
@@ -48,10 +63,10 @@ RTCData getRTCData() {
 }
 
 bool toggleHrFormat() {
-	// get hour register data
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(HOUR_ADDR) != 1) {return 0;} // send address of hours register
-	Wire.endTransmission();
+	// select seconds register to begin reading from
+	if (!selectRegister(HOUR_ADDR)) {
+		return 0;
+	}
 
 	bool	RTCHourFormat    = 0; // true for 12-hour, false for 24-hour
 	bool	RTCHourTimeOfDay = 0; // true for PM, false for AM
@@ -124,19 +139,18 @@ bool toggleHrFormat() {
 	}
 
 	// update hour register
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(HOUR_ADDR)  != 1) {return 0;} // send address of hours register
-	if (Wire.write(newHourVal) != 1) {return 0;} // send updated register value
-	Wire.endTransmission();
+	if (!writeRegister(HOUR_ADDR, newHourVal)) {
+		return 0;
+	}
 
 	return 1;
 }
 
 bool incHour() {
 	// get hour register data
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(HOUR_ADDR) != 1) {return 0;} // send address of hours register
-	Wire.endTransmission();
+	if (!selectRegister(HOUR_ADDR)) {
+		return 0;
+	}
 
 	bool	RTCHourFormat    = 0; // true for 12-hour, false for 24-hour
 	bool	RTCHourTimeOfDay = 0; // true for PM, false for AM
@@ -200,19 +214,18 @@ bool incHour() {
 	}
 
 	// update hour register
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(HOUR_ADDR)  != 1) {return 0;} // send address of hours register
-	if (Wire.write(newHourVal) != 1) {return 0;} // send updated register value
-	Wire.endTransmission();
+	if (!writeRegister(HOUR_ADDR, newHourVal)) {
+		return 0;
+	}
 
 	return 1;
 }
 
 bool decHour() {
 	// get hour register data
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(HOUR_ADDR) != 1) {return 0;} // send address of hours register
-	Wire.endTransmission();
+	if (!selectRegister(HOUR_ADDR)) {
+		return 0;
+	}
 
 	bool	RTCHourFormat    = 0; // true for 12-hour, false for 24-hour
 	bool	RTCHourTimeOfDay = 0; // true for PM, false for AM
@@ -277,24 +290,23 @@ bool decHour() {
 	}
 
 	// update hour register
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(HOUR_ADDR)  != 1) {return 0;} // send address of hours register
-	if (Wire.write(newHourVal) != 1) {return 0;} // send updated register value
-	Wire.endTransmission();
+	if (!writeRegister(HOUR_ADDR, newHourVal)) {
+		return 0;
+	}
 
 	return 1;
 }
 
 bool incMinute() {
 	// get minute register data
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(MIN_ADDR) != 1) {return 0;} // send address of minutes register
-	Wire.endTransmission();
+	if (!selectRegister(MIN_ADDR)) {
+		return 0;
+	}
 
 	uint8_t RTCMinVal1s  = 0;
 	uint8_t RTCMinVal10s = 0;
 
-	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for min
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for minute
 	if (Wire.available() == 1) { // make sure 1 byte was returned
 		uint8_t RTCMinVal = Wire.read();
 		RTCMinVal1s  = RTCMinVal & 0x0F;
@@ -321,24 +333,23 @@ bool incMinute() {
 	uint8_t newMinVal = RTCMinVal1s | (RTCMinVal10s << 4);
 
 	// update min register
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(MIN_ADDR)  != 1) {return 0;} // send address of mins register
-	if (Wire.write(newMinVal) != 1) {return 0;} // send updated register value
-	Wire.endTransmission();
+	if (!writeRegister(MIN_ADDR, newMinVal)) {
+		return 0;
+	}
 
 	return 1;
 }
 
 bool decMinute() {
 	// get minute register data
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(MIN_ADDR) != 1) {return 0;} // send address of mins register
-	Wire.endTransmission();
+	if (!selectRegister(MIN_ADDR)) {
+		return 0;
+	}
 
 	uint8_t RTCMinVal1s  = 0;
 	uint8_t RTCMinVal10s = 0;
 
-	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for min
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for minute
 	if (Wire.available() == 1) { // make sure 1 byte was returned
 		uint8_t RTCMinVal = Wire.read();
 		RTCMinVal1s  = RTCMinVal & 0x0F;
@@ -361,10 +372,9 @@ bool decMinute() {
 	uint8_t newMinVal = RTCMinVal1s | (RTCMinVal10s << 4);
 
 	// update min register
-	Wire.beginTransmission(RTC_ADDR);
-	if (Wire.write(MIN_ADDR)  != 1) {return 0;} // send address of mins register
-	if (Wire.write(newMinVal) != 1) {return 0;} // send updated register value
-	Wire.endTransmission();
+	if (!writeRegister(MIN_ADDR, newMinVal)) {
+		return 0;
+	}
 
 	return 1;
 }
