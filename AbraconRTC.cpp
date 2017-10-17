@@ -62,8 +62,77 @@ RTCData getRTCData() {
 	return newRTCData;
 }
 
+// reset RTC time to midnight
+bool setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0) {
+	// select hour register to get 12/24-hr preference
+	if (!selectRegister(HOUR_ADDR)) {
+		return 0;
+	}
+
+	uint8_t newHourVal    = 0;
+	uint8_t newMinVal     = 0;
+	uint8_t newSecVal     = 0;
+
+	if ((min < 60 && min >= 0) && (sec < 60 && sec >= 0)) {
+		uint8_t RTCMinVal1s   = min % 10;
+		uint8_t RTCMinVal10s  = (min - RTCMinVal1s)/10;
+		uint8_t RTCSecVal1s   = sec % 10;
+		uint8_t RTCSecVal10s  = (sec - RTCSecVal1s)/10;
+		newMinVal = RTCMinVal1s | (RTCMinVal10s << 4);
+		newSecVal = RTCSecVal1s | (RTCSecVal10s << 4);
+	} else {
+		return 0;
+	}
+
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for hour
+	if (Wire.available() == 1) { // make sure 1 byte was returned
+		uint8_t RTCHourVal = Wire.read();
+		bool RTCHourFormat = (RTCHourVal >> 6) & 0x01;
+		if (RTCHourFormat) { // 12-hour mode
+			if (hour <= 12 && hour >= 0) {
+				if (hour == 0) {
+					hour = 12;
+				}
+				uint8_t RTCHourVal1s  = hour % 10;
+				uint8_t RTCHourVal10s = (hour - RTCHourVal1s)/10;
+				bool RTCHourTimeOfDay = 0;
+				if (PM) { // afternoon
+					RTCHourTimeOfDay = 1;
+				}
+				newHourVal = RTCHourVal1s | (RTCHourVal10s << 4) | (RTCHourTimeOfDay << 5) | (RTCHourFormat << 6);
+			} else {
+				return 0;
+			}
+		} else { // 24-hour mode
+			if (hour < 24 && hour >= 0) {
+				if (PM) { // weird case where someone puts in 12-hour format but time is set to 24-hour format
+					if ((hour + 12) < 24) {
+						hour += 12;
+					}
+				}
+				uint8_t RTCHourVal1s  = hour % 10;
+				uint8_t RTCHourVal10s = (hour - RTCHourVal1s)/10;
+				newHourVal = RTCHourVal1s | (RTCHourVal10s << 4) | (RTCHourFormat << 6);
+			} else {
+				return 0;
+			}
+		}
+	} else {
+		return 0;
+	}
+
+	Wire.beginTransmission(RTC_ADDR);
+	if (Wire.write(SEC_ADDR)  != 1) {return 0;} // send address of register to write to
+	if (Wire.write(newSecVal) != 1) {return 0;} // send updated register value
+	if (Wire.write(newMinVal) != 1) {return 0;} // send updated register value
+	if (Wire.write(newHourVal) != 1) {return 0;} // send updated register value
+	Wire.endTransmission();
+
+	return 1;
+}
+
 bool toggleHrFormat() {
-	// select seconds register to begin reading from
+	// select hour register to begin reading from
 	if (!selectRegister(HOUR_ADDR)) {
 		return 0;
 	}
