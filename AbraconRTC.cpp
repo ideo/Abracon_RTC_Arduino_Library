@@ -410,7 +410,7 @@ bool incMinute() {
 }
 
 bool decMinute() {
-	// get minute register data
+	// select minute register data
 	if (!selectRegister(MIN_ADDR)) {
 		return 0;
 	}
@@ -442,6 +442,37 @@ bool decMinute() {
 
 	// update min register
 	if (!writeRegister(MIN_ADDR, newMinVal)) {
+		return 0;
+	}
+
+	return 1;
+}
+
+bool setTrickleCharge(bool enableTC) {
+	// select EEPROM control register data
+	if (!selectRegister(EEPROM_CTL_ADDR)) {
+		return 0;
+	}
+
+	uint8_t EEPROMCtlRegVal = 0;
+
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for minute
+	if (Wire.available() == 1) { // make sure 1 byte was returned
+		EEPROMCtlRegVal = Wire.read();
+	} else {
+		return 0;
+	}
+
+	if (enableTC) {
+		// enable 1.5kΩ trickle charge resistor
+		EEPROMCtlRegVal &= 0x1F;
+	} else {
+		// disable trickle charge resistors
+		EEPROMCtlRegVal &= 0x0F;
+	}
+	
+	// update EEPROM control register
+	if (!writeRegister(EEPROM_CTL_ADDR, EEPROMCtlRegVal)) {
 		return 0;
 	}
 
