@@ -450,13 +450,13 @@ bool decMinute() {
 
 bool setTrickleCharge(bool enableTC) {
 	// select EEPROM control register data
-	if (!selectRegister(EEPROM_CTL_ADDR)) {
+	if (!selectRegister(EE_CTL_ADDR)) {
 		return 0;
 	}
 
 	uint8_t EEPROMCtlRegVal = 0;
 
-	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for minute
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for EEPROM control register
 	if (Wire.available() == 1) { // make sure 1 byte was returned
 		EEPROMCtlRegVal = Wire.read();
 	} else {
@@ -472,8 +472,53 @@ bool setTrickleCharge(bool enableTC) {
 	}
 	
 	// update EEPROM control register
-	if (!writeRegister(EEPROM_CTL_ADDR, EEPROMCtlRegVal)) {
+	if (!writeRegister(EE_CTL_ADDR, EEPROMCtlRegVal)) {
 		return 0;
+	}
+
+	return 1;
+}
+
+/*
+	return vals
+	0: error
+	1: PON flag low
+	2: PON flag reset and tricklecharge set
+*/
+uint8_t RTCBegin() {
+	// clear PON flag if set
+	if (!selectRegister(CTL_STAT_ADDR)) {
+		return 0;
+	}
+
+	uint8_t ctlStatRegVal = 0;
+
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for control status register
+	if (Wire.available() == 1) { // make sure 1 byte was returned
+		ctlStatRegVal = Wire.read();
+	} else {
+		return 0;
+	}
+
+	uint8_t PONFlag = (ctlStatRegVal & 0x20) >> 5;
+	if (PONFlag) {
+		ctlStatRegVal &= 0xDF; // set PON flag to 0
+
+		// update EEPROM control register
+		if (!writeRegister(CTL_STAT_ADDR, ctlStatRegVal)) {
+			return 0;
+		}
+
+		// enable trickle charger
+		if (!setTrickleCharge(1)) {
+			return 0;
+		}
+
+		if (!setTime()) {
+			return 0;
+		}
+
+		return 2;
 	}
 
 	return 1;
