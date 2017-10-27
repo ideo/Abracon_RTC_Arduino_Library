@@ -1,3 +1,4 @@
+#include <util/delay.h>
 #include <Wire.h>
 #include "AbraconRTC.h"
 
@@ -14,6 +15,37 @@ static bool selectRegister(uint8_t addr) {
 	Wire.beginTransmission(RTC_ADDR);
 	if (Wire.write(addr) != 1) {return 0;} // send address of register to select
 	Wire.endTransmission();
+
+	return 1;
+}
+
+// needs some sort of error check since register could be 0
+static uint8_t readRegister(uint8_t addr) {
+	// select register to read from
+	if (!selectRegister(addr)) {
+		return 0;
+	}
+
+	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for register
+	if (Wire.available() == 1) { // make sure 1 byte was returned
+		return Wire.read();
+	}
+
+	return 0;
+}
+
+static bool writeBit(uint8_t addr, uint8_t bitPosition, bool val) {
+	uint8_t regVal = readRegister(addr);
+
+	if (val) {
+		regVal |= (1 << bitPosition);
+	} else {
+		regVal &= ~(1 << bitPosition);
+	}
+
+	if (writeRegister(addr, regVal) != 1) {
+		return 0;
+	}
 
 	return 1;
 }
@@ -448,35 +480,53 @@ bool decMinute() {
 	return 1;
 }
 
-bool setTrickleCharge(bool enableTC) {
-	// select EEPROM control register data
-	if (!selectRegister(EE_CTL_ADDR)) {
+bool checkEEPROMBusy() {
+	uint8_t ctlStatRegVal = readRegister(CTL_STAT_ADDR);
+	return ((ctlStatRegVal & 0x80) >> 7);
+}
+
+uint8_t setTrickleCharge(bool enableTC) {
+	// disable EEPROM refresh
+	if (writeBit(CTL_1_ADDR, 3, 0) != 1) {
 		return 0;
 	}
 
-	uint8_t EEPROMCtlRegVal = 0;
+	// wait for EEPROM to not be busy
+	while (checkEEPROMBusy());
 
-	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for EEPROM control register
-	if (Wire.available() == 1) { // make sure 1 byte was returned
-		EEPROMCtlRegVal = Wire.read();
-	} else {
+	// write EEPROM trickle charge setting
+	// 1.5k Ohm if enabled
+	if (!writeBit(EE_CTL_ADDR, 4, enableTC)) {
 		return 0;
 	}
 
-	if (enableTC) {
-		// enable 1.5kΩ trickle charge resistor
-		EEPROMCtlRegVal &= 0x1F;
-	} else {
-		// disable trickle charge resistors
-		EEPROMCtlRegVal &= 0x0F;
-	}
-	
-	// update EEPROM control register
-	if (!writeRegister(EE_CTL_ADDR, EEPROMCtlRegVal)) {
+	// wait 10ms
+	_delay_ms(10);
+
+	// renable EEPROM refresh
+	if (writeBit(CTL_1_ADDR, 3, 1) != 1) {
 		return 0;
 	}
 
-	return 1;
+	_delay_ms(10);
+
+	// check if value set
+	// disable EEPROM refresh
+	if (writeBit(CTL_1_ADDR, 3, 0) != 1) {
+		return 0;
+	}
+
+	// wait for EEPROM to not be busy
+	while (checkEEPROMBusy());
+
+	uint8_t newEEPROMCtlRegVal = readRegister(EE_CTL_ADDR);
+
+	// renable EEPROM refresh
+	if (writeBit(CTL_1_ADDR, 3, 1) != 1) {
+		return 0;
+	}
+
+	return newEEPROMCtlRegVal;
 }
 
 /*
@@ -486,21 +536,11 @@ bool setTrickleCharge(bool enableTC) {
 	2: PON flag reset and tricklecharge set
 */
 uint8_t RTCBegin() {
+	writeRegister(CTL_1_ADDR, 0x99);
 	// clear PON flag if set
-	if (!selectRegister(CTL_STAT_ADDR)) {
-		return 0;
-	}
-
-	uint8_t ctlStatRegVal = 0;
-
-	Wire.requestFrom(RTC_ADDR, 1); // request 1 byte for control status register
-	if (Wire.available() == 1) { // make sure 1 byte was returned
-		ctlStatRegVal = Wire.read();
-	} else {
-		return 0;
-	}
-
+	uint8_t ctlStatRegVal = readRegister(CTL_STAT_ADDR);
 	uint8_t PONFlag = (ctlStatRegVal & 0x20) >> 5;
+
 	if (PONFlag) {
 		ctlStatRegVal &= 0xDF; // set PON flag to 0
 

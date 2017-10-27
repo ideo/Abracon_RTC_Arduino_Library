@@ -3,8 +3,11 @@
 
 #include <inttypes.h>
 
-// RTC register addresses
+// RTC I2C register addresses
 #define RTC_ADDR   	  0x56 // 7 bit, without least sig R/W bit
+
+// RTC addresses
+#define CTL_1_ADDR	  0x00 // control page register
 #define CTL_STAT_ADDR 0x03 // control status register
 #define SEC_ADDR   	  0x08 // seconds address
 #define MIN_ADDR   	  0x09 // minutes address
@@ -27,7 +30,8 @@ struct RTCData {
 RTCData getRTCData();
 uint8_t RTCBegin();
 bool setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0); // resets time to midnight
-bool setTrickleCharge(bool enable);
+bool checkEEPROMBusy();
+uint8_t setTrickleCharge(bool enable);
 bool toggleHrFormat();
 bool incHour();
 bool decHour();
