@@ -33,6 +33,7 @@ bool setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0); // resets
 bool checkEEPROMBusy();
 uint8_t setTrickleCharge(bool enable);
 bool toggleHrFormat();
+bool setHrFormat(bool newHrFormat);
 bool incHour();
 bool decHour();
 bool incMinute();

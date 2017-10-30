@@ -247,6 +247,86 @@ bool toggleHrFormat() {
 	return 1;
 }
 
+// newHrFormat true  = 12 hour format
+// newHrFormat false = 24 hour format
+bool setHrFormat(bool newHrFormat) {
+	uint8_t RTCHourVal = readRegister(HOUR_ADDR);
+
+	bool	RTCHourFormat = (RTCHourVal >> 6) & 0x01; // true for 12-hour, false for 24-hour
+
+	if (RTCHourFormat == newHrFormat) {
+		return 1; // nothing to change
+	}
+
+	bool	RTCHourTimeOfDay = 0; // true for PM, false for AM
+	uint8_t RTCHourVal1s     = 0;
+	uint8_t RTCHourVal10s    = 0;
+
+	if (RTCHourFormat) {
+		RTCHourTimeOfDay = (RTCHourVal >> 5) & 0x01;
+		RTCHourVal1s     = RTCHourVal & 0x0F;
+		RTCHourVal10s    = (RTCHourVal >> 4) & 0x01;
+	} else {
+		RTCHourVal1s     = RTCHourVal & 0x0F;
+		RTCHourVal10s    = (RTCHourVal >> 4) & 0x03;
+	}
+
+	// reformat hour data for set format
+	uint8_t newHourVal = 0;
+	if (newHrFormat) { // 24-hour to 12-hour
+		RTCHourTimeOfDay = 0;
+		if (RTCHourVal10s == 1) {
+			if (RTCHourVal1s > 2) {
+				RTCHourTimeOfDay = 1;
+				RTCHourVal10s    = 0;
+				RTCHourVal1s    -= 2;
+			} else if (RTCHourVal1s == 2) {
+				RTCHourTimeOfDay = 1;
+			}
+		} else if (RTCHourVal10s == 2) {
+			RTCHourTimeOfDay = 1;
+			if (RTCHourVal1s > 2) {
+				RTCHourVal10s = 1;
+				RTCHourVal1s -= 2;
+			} else {
+				RTCHourVal10s = 0;
+				RTCHourVal1s += 8;
+			}
+		} else if (RTCHourVal1s == 0) { // 0 o'clock
+			RTCHourVal1s =  2;
+			RTCHourVal10s = 1;
+			RTCHourTimeOfDay = 0;
+		}
+		newHourVal = RTCHourVal1s | (RTCHourVal10s << 4) | (RTCHourTimeOfDay << 5) | (RTCHourFormat << 6);
+	} else { // 12-hour to 24-hour
+		if (RTCHourTimeOfDay) {
+			if (RTCHourVal10s == 0) {
+				if (RTCHourVal1s < 8) {
+					RTCHourVal1s += 2;
+					RTCHourVal10s = 1;
+				} else {
+					RTCHourVal1s -= 8;
+					RTCHourVal10s = 2;
+				}
+			} else if (RTCHourVal1s < 2) {
+				RTCHourVal1s += 2;
+				RTCHourVal10s = 2;
+			}
+		} else if (RTCHourVal1s == 2) { // midnight
+			RTCHourVal1s  = 0;
+			RTCHourVal10s = 0;
+		}
+		newHourVal = RTCHourVal1s | (RTCHourVal10s << 4) | (RTCHourFormat << 6);
+	}
+
+	// update hour register
+	if (!writeRegister(HOUR_ADDR, newHourVal)) {
+		return 0;
+	}
+
+	return 1;
+}
+
 bool incHour() {
 	// get hour register data
 	if (!selectRegister(HOUR_ADDR)) {
