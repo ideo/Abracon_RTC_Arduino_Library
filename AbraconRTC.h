@@ -27,16 +27,45 @@ struct RTCData {
 	uint8_t tempF;
 };
 
-RTCData getRTCData();
-uint8_t RTCBegin();
-bool setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0); // resets time to midnight
-bool checkEEPROMBusy();
-uint8_t setTrickleCharge(bool enable);
-bool toggleHrFormat();
-bool setHrFormat(bool newHrFormat);
-bool incHour();
-bool decHour();
-bool incMinute();
-bool decMinute();
+
+class AbraRTC {
+	private:
+		static uint8_t error;
+		static RTCData AbraRTCData;
+
+		static bool writeRegister(uint8_t addr, uint8_t val);
+		static bool selectRegister(uint8_t addr);
+		static bool readRegister(uint8_t addr, uint8_t &readVal);
+		static bool writeBit(uint8_t addr, uint8_t bitPosition, bool val);
+
+		static uint8_t hour12to24(uint8_t RTCHourTimeOfDay, uint8_t RTCHourVal1s, uint8_t RTCHourVal10s);
+		static uint8_t hour24to12(uint8_t RTCHourVal1s, uint8_t RTCHourVal10s);
+		static bool checkEEPROMBusy();
+	public:
+		AbraRTC();
+		void begin();
+
+		void updateRTC();
+		uint8_t getHour1s() { return AbraRTCData.hour1s; }
+		uint8_t getHour10s() { return AbraRTCData.hour10s; }
+		bool 	getHrFormat() { return AbraRTCData.hrFormat; }
+		bool	getTimeOfDay() { return AbraRTCData.timeOfDay; }
+		uint8_t getMin1s() { return AbraRTCData.min1s; }
+		uint8_t getMin10s() { return AbraRTCData.min10s; }
+		uint8_t getSec1s() { return AbraRTCData.sec1s; }
+		uint8_t getSec10s() { return AbraRTCData.sec10s; }
+		uint8_t getTempF() { return AbraRTCData.tempF; }
+
+		bool setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0);
+		bool setTrickleCharge(bool enable);
+		bool toggleHrFormat();
+		bool setHrFormat(bool newHrFormat);
+		bool incHour();
+		bool decHour();
+		bool incMinute();
+		bool decMinute();
+};
+
+extern AbraRTC RTC;
 
 #endif
