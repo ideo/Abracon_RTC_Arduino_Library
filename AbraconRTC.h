@@ -30,7 +30,6 @@ struct RTCData {
 
 class AbraRTC {
 	private:
-		static uint8_t error;
 		static RTCData AbraRTCData;
 
 		static bool writeRegister(uint8_t addr, uint8_t val);
@@ -43,9 +42,9 @@ class AbraRTC {
 		static bool checkEEPROMBusy();
 	public:
 		AbraRTC();
-		void begin();
+		bool begin();
+		bool updateRTC();
 
-		void updateRTC();
 		uint8_t getHour1s() { return AbraRTCData.hour1s; }
 		uint8_t getHour10s() { return AbraRTCData.hour10s; }
 		bool 	getHrFormat() { return AbraRTCData.hrFormat; }
@@ -58,12 +57,12 @@ class AbraRTC {
 
 		bool setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0);
 		bool setTrickleCharge(bool enable);
-		bool toggleHrFormat();
 		bool setHrFormat(bool newHrFormat);
-		bool incHour();
-		bool decHour();
-		bool incMinute();
-		bool decMinute();
+		static bool toggleHrFormat();
+		static bool incHour();
+		static bool decHour();
+		static bool incMin();
+		static bool decMin();
 };
 
 extern AbraRTC RTC;

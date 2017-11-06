@@ -4,7 +4,6 @@
 
 // Initialize Class Variables //////////////////////////////////////////////////
 
-uint8_t AbraRTC::error = 0; // no errors to start
 RTCData AbraRTC::AbraRTCData = {0};
 
 // Constructors ////////////////////////////////////////////////////////////////
@@ -204,39 +203,37 @@ static bool AbraRTC::checkEEPROMBusy() {
   Description
     begin RTC by checking if power was lost and enabling tricklecharge if so
   Return
-	0: error
-	1: PON flag low (no time loss)
-	2: PON flag reset and tricklecharge set (time was lost)
+	true if success, false if error
 */
-void AbraRTC::begin() {
+bool AbraRTC::begin() {
 	// clear PON flag if set
 	uint8_t ctlStatRegVal = 0;
-	if (!readRegister(CTL_STAT_ADDR, ctlStatRegVal)) { error = 1; return; }
+	if (!readRegister(CTL_STAT_ADDR, ctlStatRegVal)) { return 0; }
 	uint8_t PONFlag = (ctlStatRegVal & 0x20) >> 5;
 
 	if (PONFlag) {
 		// update EEPROM control register / reset PON flag
 		ctlStatRegVal &= 0xDF; // set PON flag to 0
-		if (!writeRegister(CTL_STAT_ADDR, ctlStatRegVal)) { error = 1; return; }
+		if (!writeRegister(CTL_STAT_ADDR, ctlStatRegVal)) { return 0; }
 
 		// enable trickle charger
-		if (!setTrickleCharge(1)) { error = 1; return; }
+		if (!setTrickleCharge(1)) { return 0; }
 
-		if (!setTime()) { error = 1; return; }
+		if (!setTime()) { return 0; }
 	}
 
-	updateRTC();
+	if (!updateRTC()) { return 0; }
 
-	return;
+	return 1;
 }
 
 /*
   Description
     get current data (time and temp) from RTC
   Return
-    current time and temperature in RTCData format from RTC
+    true if success, false if error
 */
-void AbraRTC::updateRTC() {
+bool AbraRTC::updateRTC() {
 	// select seconds register to begin reading from
 	selectRegister(SEC_ADDR);
 
@@ -261,8 +258,7 @@ void AbraRTC::updateRTC() {
 			AbraRTCData.hour10s   = (RTCHourVal >> 4) & 0x03;
 		}
 	} else { // something went wrong and we didn't get all 3 time registers
-		error = 1;
-		return;
+		return 0;
 	}
 
 	// get temperature
@@ -274,10 +270,10 @@ void AbraRTC::updateRTC() {
 		uint8_t RTCTempC = Wire.read() - 60;
 		AbraRTCData.tempF  = RTCTempC * 1.8 + 32;
 	} else {
-		error = 1;
+		return 0;
 	}
 
-	return;
+	return 1;
 }
 
 /*
@@ -366,7 +362,7 @@ bool AbraRTC::setTime(uint8_t hour=0, uint8_t min=0, uint8_t sec=0, bool PM=0) {
   Return
     true if success, false if error
 */
-bool AbraRTC::toggleHrFormat() {
+static bool AbraRTC::toggleHrFormat() {
 	uint8_t RTCHourVal = 0;
 	if (!readRegister(HOUR_ADDR, RTCHourVal)) { return 0; }
 
@@ -453,7 +449,7 @@ bool AbraRTC::setHrFormat(bool newHrFormat) {
   Return
     true if success, false if error
 */
-bool AbraRTC::incHour() {
+static bool AbraRTC::incHour() {
 	// get current hour
 	uint8_t RTCHourVal = 0;
 	if (!readRegister(HOUR_ADDR, RTCHourVal)) { return 0; }
@@ -534,7 +530,7 @@ bool AbraRTC::incHour() {
   Return
     true if success, false if error
 */
-bool AbraRTC::decHour() {
+static bool AbraRTC::decHour() {
 	// get hour register data
 	if (!selectRegister(HOUR_ADDR)) {
 		return 0;
@@ -624,7 +620,7 @@ bool AbraRTC::decHour() {
   Return
     true if success, false if error
 */
-bool AbraRTC::incMinute() {
+static bool AbraRTC::incMin() {
 	// get minute register data
 	if (!selectRegister(MIN_ADDR)) {
 		return 0;
@@ -673,7 +669,7 @@ bool AbraRTC::incMinute() {
   Return
     true if success, false if error
 */
-bool AbraRTC::decMinute() {
+static bool AbraRTC::decMin() {
 	// select minute register data
 	if (!selectRegister(MIN_ADDR)) {
 		return 0;
